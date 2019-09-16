@@ -55,14 +55,22 @@ class DataGenerator(keras.utils.Sequence):
         y_sr_batch = None
         if self.do_superres:
             y_sr_batch = np.zeros((self.batch_size, self.output_size, self.output_size, 22), dtype=np.float32)
-        
-        for i, (fn, state) in enumerate(fns):
+
+            
+        def load_from_fn(fn):
             if fn.endswith(".npz"):
                 data = np.load(fn)["arr_0"].squeeze()
+                # (c h w)
             elif fn.endswith(".npy"):
                 data = np.load(fn).squeeze()
-            data = np.rollaxis(data, 0, 3)
+            return data
 
+        
+        for i, (fn, state) in enumerate(fns):
+            data = load_from_fn(fn)
+            data = np.rollaxis(data, 0, 3)
+            # (h w c)
+            
             #do a random crop if input_size is less than the prescribed size
             assert data.shape[0] == data.shape[1]
             data_size = data.shape[0]
@@ -79,7 +87,7 @@ class DataGenerator(keras.utils.Sequence):
                 x_batch[i] = data[:,:,:4] / 255.0
 
             # setup y_highres
-            y_train_hr = data[:,:,8]
+            y_train_hr = load_from_fn(fn.replace('naip', 'lc'))
             y_train_hr[y_train_hr==15] = 0
             y_train_hr[y_train_hr==5] = 4
             y_train_hr[y_train_hr==6] = 4
@@ -95,11 +103,13 @@ class DataGenerator(keras.utils.Sequence):
             y_hr_batch[i] = y_train_hr
             
             # setup y_superres
-            if self.do_superres:
-                y_train_nlcd = nlcd_classes_to_idx(data[:,:,9])
-                y_train_nlcd = keras.utils.to_categorical(y_train_nlcd, 22)
-                y_sr_batch[i] = y_train_nlcd
-
+            try:
+                if self.do_superres:
+                    y_train_nlcd = nlcd_classes_to_idx(data[:,:,9])
+                    y_train_nlcd = keras.utils.to_categorical(y_train_nlcd, 22)
+                    y_sr_batch[i] = y_train_nlcd
+            except:
+                raise Exception('No super-resolution data available.')
         
         if self.do_superres:
             return x_batch.copy(), {"outputs_hr": y_hr_batch, "outputs_sr": y_sr_batch}

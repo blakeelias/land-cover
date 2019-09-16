@@ -16,7 +16,7 @@ TEST_SPLITS=(
     ny_1m_2013
 )
 
-GPU_ID=3
+GPU_ID=0
 LOSS=${LOSSES[0]}
 MODEL_TYPE=${MODEL_TYPES[0]}
 
@@ -24,8 +24,8 @@ MODEL_TYPE=${MODEL_TYPES[0]}
 BATCH_SIZE=16
 LEARNING_RATE=0.001
 
-TRAIN_STATE_LIST="md_1m_2013"
-VAL_STATE_LIST="ny_1m_2013"
+TRAIN_STATE_LIST="south"
+VAL_STATE_LIST="north"
 SUPERRES_STATE_LIST="ny_1m_2013"
 
 MODEL_FN="model_10.h5"
@@ -33,8 +33,8 @@ MODEL_FN_INST=${MODEL_FN%.*}
 
 EXP_NAME=CVPR-for_github-loss-${LOSS}-model-${MODEL_TYPE}-training_states-${TRAIN_STATE_LIST// /-}
 EXP_NAME_OUT=${EXP_NAME}-instance-${MODEL_FN_INST}
-OUTPUT=/mnt/blobfuse/train-output/ForCVPR
-PRED_OUTPUT=/mnt/blobfuse/pred-output/ForCVPR
+OUTPUT=/mnt/blobfuse/train-output/ICLR_2020
+PRED_OUTPUT=/mnt/blobfuse/pred-output/ICLR_2020
 
 if [ ! -f "${OUTPUT}/${EXP_NAME}/${MODEL_FN}" ]; then
     echo "This experiment hasn't been trained! Exiting..."

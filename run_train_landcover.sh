@@ -13,12 +13,8 @@ MODEL_TYPES=(
 )
 
 STATES=(
-    de_1m_2013
-    ny_1m_2013
-    md_1m_2013
-    pa_1m_2013
-    wv_1m_2014
-    va_1m_2014
+    north,
+    south
 )
 
 GPU_ID=0
@@ -29,13 +25,13 @@ MODEL_TYPE=${MODEL_TYPES[0]}
 BATCH_SIZE=16
 LEARNING_RATE=0.001
 
-TRAIN_STATE_LIST="md_1m_2013"
-VAL_STATE_LIST="ny_1m_2013"
+TRAIN_STATE_LIST="south"
+VAL_STATE_LIST="north"
 SUPERRES_STATE_LIST="ny_1m_2013"
 
 
 EXP_NAME=CVPR-for_github-loss-${LOSS}-model-${MODEL_TYPE}-training_states-${TRAIN_STATE_LIST// /-}
-OUTPUT=/mnt/blobfuse/train-output/ForCVPR
+OUTPUT=/mnt/blobfuse/train-output/ICLR_2020
 
 if [ -d "${OUTPUT}/${EXP_NAME}" ]; then
     echo "Experiment ${OUTPUT}/${EXP_NAME} exists"
@@ -80,7 +76,7 @@ python -u train_model_landcover.py \
     --name ${EXP_NAME} \
     --gpu ${GPU_ID} \
     --verbose 1 \
-    --data_dir /home/caleb/data/ \
+    --data_dir /mnt/blobfuse/cnn-minibatches/clustering/ \
     --training_states ${TRAIN_STATE_LIST} \
     --validation_states ${VAL_STATE_LIST} \
     --superres_states ${SUPERRES_STATE_LIST} \
