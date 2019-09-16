@@ -8,7 +8,7 @@ from keras.losses import categorical_crossentropy
 from architectures import UNet, FC_DenseNet, FCN_Small
 from utils import load_nlcd_stats
 
-from segmentation_models import Unet as seg_Unet
+# from segmentation_models import Unet as seg_Unet
 
 def jaccard_loss(y_true, y_pred, smooth=0.001, num_classes=7):                                                                              
     intersection = y_true * y_pred                                                                                                          
