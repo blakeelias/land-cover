@@ -5,7 +5,7 @@ from keras.layers import Lambda, Activation
 
 from keras.losses import categorical_crossentropy
 
-from architectures import UNet, FC_DenseNet, FCN_Small
+from architectures import UNet, FC_DenseNet, FCN_Small, ClusterVoting
 from utils import load_nlcd_stats
 
 # from segmentation_models import Unet as seg_Unet
@@ -66,6 +66,14 @@ def sr_loss(nlcd_class_weights, nlcd_means, nlcd_vars, boundary=0):
         return super_res_crit
     
     return loss
+
+def unet_voting(img_shape, num_clusters, num_labels, radius, optimizer, loss):
+    width, height, num_channels = img_shape
+    pred_shape = (width, height, num_labels)
+    i, pred = UNet(img_shape, dims=[64, 32, 32, 32, 32], out_ch=num_labels)
+    pred = Activation("softmax", name="outputs_hr")(pred)
+    c, o = ClusterVoting(pred_shape, num_clusters, radius)(pred)
+    return make_model([i, c], o, optimizer, loss)
 
 def unet(img_shape, num_classes, optimizer, loss):
     i, o = UNet(img_shape, dims=[64, 32, 32, 32, 32], out_ch=num_classes)

@@ -66,7 +66,7 @@ def do_args(arg_list, name):
     parser.add_argument("--color", action="store_true", help="Enable color augmentation", default=False)
 
     parser.add_argument("--model_type", action="store", dest="model_type", type=str, \
-        choices=["unet", "unet_large", "fcdensenet", "fcn_small"], \
+        choices=["unet", "unet_large", "fcdensenet", "fcn_small", "unet_voting"], \
         help="Model architecture to use", required=True
     )
     parser.add_argument("--learning_rate", action="store", type=float, help="Learning rate", default=0.001)
@@ -99,7 +99,8 @@ def main():
     loss = args.loss
     do_color_aug = args.color
     do_superres = loss == "superres"
-
+    do_cluster_vote_training = (args.model_type == 'unet_voting')
+    
     log_dir = os.path.join(output, name)
 
     assert os.path.exists(log_dir), "Output directory doesn't exist"
@@ -115,23 +116,32 @@ def main():
     #------------------------------
     # Step 1, load data
     #------------------------------
-
     training_patches = []
+    training_clusters = []
+    training_labels = []
+    
     for state in training_states:
         print("Adding training patches from %s" % (state))
-        fn = os.path.join(data_dir, "%s-train_patches.csv" % (state))
-        df = pd.read_csv(fn)
+        patches_fn = os.path.join(data_dir, "%s-train_patches.csv" % (state))
+        df = pd.read_csv(patches_fn)
         for fn in df["patch_fn"].values:
             training_patches.append((os.path.join(data_dir, state, fn), state))
-
+            training_labels.append((os.path.join(data_dir, state, fn.replace('naip', 'lc')), state))
+            training_clusters.append((os.path.join(data_dir, state, '_seg', fn.replace('naip', '')), state))
+            
     validation_patches = []
+    validation_clusters = []
+    validation_labels = []
+    
     for state in validation_states:
         print("Adding validation patches from %s" % (state))
         fn = os.path.join(data_dir, "%s-val_patches.csv" % (state))
         df = pd.read_csv(fn)
         for fn in df["patch_fn"].values:
             validation_patches.append((os.path.join(data_dir, state, fn), state))
-
+            validation_labels.append((os.path.join(data_dir, state, fn.replace('naip', 'lc')), state))
+            validation_clusters.append((os.path.join(data_dir, state, '_seg', fn.replace('naip', '')), state))
+            
     print("Loaded %d training patches and %d validation patches" % (len(training_patches), len(validation_patches)))
 
     if do_superres:
@@ -161,6 +171,8 @@ def main():
         model = models.fcdensenet((240,240,4), 5, optimizer, loss)
     elif model_type == "fcn_small":
         model = models.fcn_small((240,240,4), 5, optimizer, loss)
+    elif model_type == "unet_voting":
+        model = models.unet_voting((240, 240, 4), 8, 5, 25, optimizer, loss)
     model.summary()
 
     validation_callback = utils.LandcoverResults(log_dir=log_dir, time_budget=time_budget, verbose=verbose)
@@ -174,8 +186,8 @@ def main():
         period=1
     )
 
-    training_generator = datagen.DataGenerator(training_patches, batch_size, training_steps_per_epoch, 240, 240, 4, do_color_aug=do_color_aug, do_superres=do_superres, superres_only_states=superres_states)
-    validation_generator = datagen.DataGenerator(validation_patches, batch_size, validation_steps_per_epoch, 240, 240, 4, do_color_aug=do_color_aug, do_superres=do_superres, superres_only_states=[])
+    training_generator = datagen.DataGenerator(training_patches, training_clusters, training_labels, batch_size, training_steps_per_epoch, 240, 240, 4, do_color_aug=do_color_aug, do_superres=do_superres, superres_only_states=superres_states, do_cluster_vote_training=do_cluster_vote_training)
+    validation_generator = datagen.DataGenerator(validation_patches, validation_clusters, validation_labels, batch_size, validation_steps_per_epoch, 240, 240, 4, do_color_aug=do_color_aug, do_superres=do_superres, superres_only_states=[], do_cluster_vote_training=do_cluster_vote_training)
 
     model.fit_generator(
         training_generator,

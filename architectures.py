@@ -4,6 +4,8 @@ from keras.models import Input, Model
 from keras.layers import Conv2D, Concatenate, MaxPooling2D, Conv2DTranspose, Activation
 from keras.layers import UpSampling2D, Dropout, BatchNormalization
 
+from pdb import set_trace as b
+
 #------------------
 # TODO: implement different parameters in the unet and dense blocks
 #------------------
@@ -52,6 +54,43 @@ def UNet(img_shape, dims=[32, 64, 128, 256, 128], out_ch=1, activation='relu', d
 	o = level_block_fixed_dims(i, dims, len(dims)-1, activation, dropout, batchnorm, maxpool, upconv, residual, dense=False)
 	o = Conv2D(out_ch, 1, activation=None, name="logits")(o)
 	return i, o
+
+def local_avg(self, data, radius, stride=1):
+    w,h = data.shape[-2:]
+    diameter = 2 * radius + 1
+    new_data = data.reshape(-1, 1, w, h)
+    normalization_data = np.ones(new_data.shape)
+    mean = keras.layers.AveragePooling2D(new_data, pool_size=(diameter, diameter), strides=(stride, stride), padding='same')
+    normalization = keras.layers.AveragePooling2D(normalization_data, pool_size=(diameter, diameter), strides=(stride, stride), padding='same')
+    mean_normalized = mean / normalization
+    
+    if stride>1:
+        raise Exception('stride > 1 not implemented yet - convert Torch code to Keras')
+    # Torch version:
+    # mean_normalized = torch.nn.functional.interpolate(mean_normalized, size=(w,h), mode='bilinear')
+
+    return mean_normalized.view(data.shape)
+    
+    
+def ClusterVoting(pred_shape, num_clusters, radius):
+    width, height, num_labels = pred_shape
+    preds = Input(shape=pred_shape)
+    clusters_shape = (width, height, num_clusters)
+    clusters = Input(shape=clusters_shape)
+
+    b()
+    norms = local_avg(clusters.view((-1, width, height), radius, 1).view(clusters_shape))
+    pairs = tf.einsum('bcxy, bzxy -> bczxy', clusters, preds)
+    votes = local_avg(pairs.contiguous().view((-1, width, height)), radius, 1).view(pairs.shape)
+
+    votes = (votes + 0.0001) / (norms.unsqueeze(2) + 0.01)
+
+    output = (votes * clusters.unsqueeze(2)).sum(1) # c
+    output = output[:,:-1,:,:]
+    output /= output.sum(1).unsqueeze(1) # z
+    
+    return [pred, clusters], o
+
 
 def FC_DenseNet(img_shape, dims=[32, 16, 16, 16, 16], out_ch=1, activation='relu', dropout=False, batchnorm=True, maxpool=True, upconv=True, residual=False):
     i = Input(shape=img_shape)

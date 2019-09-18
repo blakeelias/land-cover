@@ -10,6 +10,7 @@ MODEL_TYPES=(
     "unet"
     "unet_large"
     "fcdensenet"
+    "unet_voting"
 )
 
 STATES=(
@@ -19,7 +20,7 @@ STATES=(
 
 GPU_ID=0
 LOSS=${LOSSES[0]}
-MODEL_TYPE=${MODEL_TYPES[0]}
+MODEL_TYPE=${MODEL_TYPES[3]}
 
 ((TIME_BUDGET=3600*12))
 BATCH_SIZE=16
