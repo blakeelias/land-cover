@@ -3,7 +3,11 @@ import keras.backend as K
 from keras.models import Input, Model
 from keras.layers import Conv2D, Concatenate, MaxPooling2D, Conv2DTranspose, Activation
 from keras.layers import UpSampling2D, Dropout, BatchNormalization
+import keras
+import tensorflow as tf
 
+import einops
+import numpy as np
 from pdb import set_trace as b
 
 #------------------
@@ -55,13 +59,16 @@ def UNet(img_shape, dims=[32, 64, 128, 256, 128], out_ch=1, activation='relu', d
 	o = Conv2D(out_ch, 1, activation=None, name="logits")(o)
 	return i, o
 
-def local_avg(self, data, radius, stride=1):
-    w,h = data.shape[-2:]
+def local_avg(data, radius, stride=1):
+    w,h = data.shape[1:2]
+    w = int(w)
+    h = int(h)
     diameter = 2 * radius + 1
-    new_data = data.reshape(-1, 1, w, h)
-    normalization_data = np.ones(new_data.shape)
-    mean = keras.layers.AveragePooling2D(new_data, pool_size=(diameter, diameter), strides=(stride, stride), padding='same')
-    normalization = keras.layers.AveragePooling2D(normalization_data, pool_size=(diameter, diameter), strides=(stride, stride), padding='same')
+    b()
+    normalization_data = K.ones((1, w, h, num_channels))
+
+    mean = keras.layers.AveragePooling2D(pool_size=(diameter, diameter), strides=(stride, stride), padding='same', data_format='channels_last')(data)
+    normalization = keras.layers.AveragePooling2D(pool_size=(diameter, diameter), strides=(stride, stride), padding='same', data_format='channels_last')(normalization_data)
     mean_normalized = mean / normalization
     
     if stride>1:
@@ -69,7 +76,7 @@ def local_avg(self, data, radius, stride=1):
     # Torch version:
     # mean_normalized = torch.nn.functional.interpolate(mean_normalized, size=(w,h), mode='bilinear')
 
-    return mean_normalized.view(data.shape)
+    return mean_normalized
     
     
 def ClusterVoting(pred_shape, num_clusters, radius):
@@ -78,12 +85,13 @@ def ClusterVoting(pred_shape, num_clusters, radius):
     clusters_shape = (width, height, num_clusters)
     clusters = Input(shape=clusters_shape)
 
-    b()
-    norms = local_avg(clusters.view((-1, width, height), radius, 1).view(clusters_shape))
-    pairs = tf.einsum('bcxy, bzxy -> bczxy', clusters, preds)
-    votes = local_avg(pairs.contiguous().view((-1, width, height)), radius, 1).view(pairs.shape)
+    norms = local_avg(clusters, radius, 1)
+    
+    pairs = tf.einsum('bxyc, bxyz -> bxycz', clusters, preds)
+    votes = local_avg(pairs, radius, 1)
 
-    votes = (votes + 0.0001) / (norms.unsqueeze(2) + 0.01)
+    b()
+    votes = (votes + 0.0001) / (norms.unsqueeze(3) + 0.01)
 
     output = (votes * clusters.unsqueeze(2)).sum(1) # c
     output = output[:,:-1,:,:]
