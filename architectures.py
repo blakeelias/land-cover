@@ -7,6 +7,8 @@ import keras
 import tensorflow as tf
 
 import einops
+import einops.layers
+import einops.layers.keras
 import numpy as np
 from pdb import set_trace as b
 
@@ -60,12 +62,12 @@ def UNet(img_shape, dims=[32, 64, 128, 256, 128], out_ch=1, activation='relu', d
 	return i, o
 
 def local_avg(data, radius, stride=1):
-    w,h = data.shape[1:2]
+    w, h = data.shape[1], data.shape[2]
+    num_channels_dims = data.shape[3:]
     w = int(w)
     h = int(h)
     diameter = 2 * radius + 1
-    b()
-    normalization_data = K.ones((1, w, h, num_channels))
+    normalization_data = K.ones((1, w, h) + tuple(num_channels_dims))
 
     mean = keras.layers.AveragePooling2D(pool_size=(diameter, diameter), strides=(stride, stride), padding='same', data_format='channels_last')(data)
     normalization = keras.layers.AveragePooling2D(pool_size=(diameter, diameter), strides=(stride, stride), padding='same', data_format='channels_last')(normalization_data)
@@ -87,9 +89,11 @@ def ClusterVoting(pred_shape, num_clusters, radius):
 
     norms = local_avg(clusters, radius, 1)
     
-    pairs = tf.einsum('bxyc, bxyz -> bxycz', clusters, preds)
-    votes = local_avg(pairs, radius, 1)
+    pairs = tf.einsum('bxyc, bxyl -> bxycl', clusters, preds)
 
+    b()
+    votes = local_avg(einops.layers.keras.Rearrange('b x y c l -> b x y (c l)')(pairs), radius, 1)
+    votes = einops.layers.keras.Rearrange('b x y (c l) -> b x y c l', c = num_clusters)(votes)
     b()
     votes = (votes + 0.0001) / (norms.unsqueeze(3) + 0.01)
 
